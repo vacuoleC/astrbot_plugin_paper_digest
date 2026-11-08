@@ -596,10 +596,16 @@ class Main(star.Star):
         facts, copy, image, cards = await self.build_daily(
             report_date, rows, window_start, now
         )
-        yield event.plain_result(
-            f"日报已生成（未推送）：入选 {facts['stats']['selected_total']} 篇，"
-            f"图片 {image or '渲染失败'}，卡片 {sum(1 for v in cards.values() if v)} 张。"
-        )
+        good_cards = sum(1 for v in cards.values() if v)
+        msg = (f"日报已生成（未推送）：入选 {facts['stats']['selected_total']} 篇，"
+               f"卡片 {good_cards} 张。")
+        if image:
+            msg += "\n趋势图如下（同时已归档）。"
+        else:
+            msg += "\n趋势图渲染失败（已重试），请查看日志；卡片已保存到归档目录。"
+        yield event.plain_result(msg)
+        if image:
+            yield event.image_result(image)
 
     @filter.command("paper_skill_test")
     @filter.permission_type(filter.PermissionType.ADMIN)
