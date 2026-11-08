@@ -138,6 +138,15 @@ class Store:
                     created_at TEXT
                 );
 
+                CREATE TABLE IF NOT EXISTS weekly_digests (
+                    week_start TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    digest_json TEXT,
+                    model TEXT,
+                    created_at TEXT,
+                    PRIMARY KEY (week_start, direction)
+                );
+
                 CREATE TABLE IF NOT EXISTS overrides (
                     paper_pk INTEGER PRIMARY KEY,
                     action TEXT NOT NULL,
@@ -420,6 +429,31 @@ class Store:
                  raw_output, json.dumps(copy, ensure_ascii=False) if copy else None,
                  1 if valid else 0, error, model, _now()),
             )
+
+    # ---------- weekly digests ----------
+
+    def save_weekly_digest(self, week_start: str, direction: str, digest: dict,
+                           model: str) -> None:
+        with self._lock, self.connect() as con:
+            con.execute(
+                """INSERT OR REPLACE INTO weekly_digests
+                   (week_start, direction, digest_json, model, created_at)
+                   VALUES (?,?,?,?,?)""",
+                (week_start, direction, json.dumps(digest, ensure_ascii=False),
+                 model, _now()),
+            )
+
+    def get_weekly_digest(self, week_start: str, direction: str) -> dict[str, Any] | None:
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT * FROM weekly_digests WHERE week_start=? AND direction=?",
+                (week_start, direction),
+            ).fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            d["digest"] = json.loads(d.get("digest_json") or "{}")
+            return d
 
     # ---------- overrides ----------
 

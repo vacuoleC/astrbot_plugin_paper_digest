@@ -23,6 +23,7 @@ from .llm import provider_name, resolve_provider
 from .pipeline import (
     allocate_cap,
     build_daily_facts,
+    build_week_digests,
     build_weekly_facts,
     classify_candidates,
     compute_baseline,
@@ -30,6 +31,7 @@ from .pipeline import (
     select_direction,
     select_weekly,
 )
+from .pipeline.normalize import abstract_snippet, paper_id
 from .push import get_adapter, push_daily, push_weekly
 from .render import Renderer
 from .skills import run_skill
@@ -63,6 +65,8 @@ DEFAULTS: dict[str, Any] = {
     "daily_top_per_direction": 5,
     "daily_cap_factor": 4,
     "weekly_per_direction": 3,
+    "weekly_digest_batch_size": 120,
+    "weekly_digest_concurrency": 4,
     "max_themes_per_direction": 5,
     "prefilter_per_direction": 120,
     "llm_batch_size": 30,
@@ -445,6 +449,15 @@ class Main(star.Star):
         totals = Counter(cls.get("primary") for cls in classifications.values())
         source_stats = Counter(row.get("source") or "unknown" for row in rows)
 
+        # 周报不能只看 3 篇精选：按方向汇总本周全部论文（标题+摘要片段），
+        # 让 weekly SKILL 能对该方向整体做点评。
+        digests = await build_week_digests(
+            context=self.context, rows=rows, classifications=classifications,
+            config=self.config, store=self.store,
+            week_start=window_start.date().isoformat(),
+        )
+        daily_highlights = self._collect_daily_highlights(window_end)
+
         daily_summaries = []
         for offset in range(7):
             day = (window_end - timedelta(days=offset)).strftime("%Y-%m-%d")
@@ -464,7 +477,7 @@ class Main(star.Star):
             week_end=window_end.astimezone(timezone.utc).isoformat(),
             selected=selected, totals=dict(totals),
             source_stats=dict(source_stats), daily_summaries=daily_summaries,
-            baseline={},
+            baseline={}, digests=digests, daily_highlights=daily_highlights,
         )
         self.store.save_report("weekly", report_date, facts, copy=None, status="built")
         copy = await run_skill(
@@ -479,6 +492,35 @@ class Main(star.Star):
         image = await self.renderer.render_weekly(facts, copy)
         cards = await self.renderer.render_cards(facts)
         return facts, copy, image, cards
+
+    def _collect_daily_highlights(self, window_end: datetime) -> dict[str, list[dict]]:
+        """收集本周日报里出现过的精选论文，供周报参考。"""
+        out: dict[str, list[dict]] = {d.key: [] for d in DIRECTIONS}
+        seen: set[tuple[str, int]] = set()
+        for offset in range(7):
+            day = (window_end - timedelta(days=offset)).strftime("%Y-%m-%d")
+            for d in DIRECTIONS:
+                selection = self.store.get_selection(day, d.key)
+                if not selection:
+                    continue
+                for pk in selection.get("paper_pks") or []:
+                    key = (d.key, int(pk))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    row = self.store.get_paper(int(pk))
+                    if not row:
+                        continue
+                    out[d.key].append({
+                        "id": paper_id(row["pk"]),
+                        "title": row.get("title") or "",
+                        "source": row.get("source") or "",
+                        "published": (row.get("published") or "")[:10],
+                        "url": row.get("url") or "",
+                        "day": day,
+                        "abstract_snippet": abstract_snippet(row, 160),
+                    })
+        return {key: items[:10] for key, items in out.items()}
 
     # ---------- push helpers ----------
 
@@ -611,7 +653,7 @@ class Main(star.Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_build_weekly(self, event: AstrMessageEvent):
         """立即生成最近 7 天的周报（影响力选片、文案、周报图和卡片），不推送，用于预览效果。"""
-        yield event.plain_result("⏳ 开始生成周报（分类/影响力选片/文案/渲染，首次约 3–8 分钟，缓存后约 1 分钟）...")
+        yield event.plain_result("⏳ 开始生成周报（全量主题汇总/选片/文案/渲染，首次约 5–15 分钟，缓存后约 1–2 分钟）...")
         now = datetime.now(self.tz)
         window_start = now - timedelta(days=7)
         rows = self.store.papers_first_seen_between(

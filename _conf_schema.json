@@ -131,5 +131,15 @@
     "description": "输出调试日志",
     "type": "bool",
     "default": false
+  },
+  "weekly_digest_batch_size": {
+    "description": "周报全量论文主题汇总时每批篇数",
+    "type": "int",
+    "default": 120
+  },
+  "weekly_digest_concurrency": {
+    "description": "周报主题汇总的并发批次数",
+    "type": "int",
+    "default": 4
   }
 }

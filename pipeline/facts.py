@@ -89,13 +89,16 @@ def paper_facts(item: dict[str, Any]) -> dict[str, Any]:
 
 def _direction_block(direction_key: str,
                      items: list[dict[str, Any]],
-                     total: int) -> dict[str, Any]:
+                     total: int,
+                     digest: dict[str, Any] | None = None,
+                     daily_highlights: list[dict[str, Any]] | None = None
+                     ) -> dict[str, Any]:
     direction = DIRECTION_BY_KEY[direction_key]
     papers = [paper_facts(i) for i in items]
     themes: dict[str, list[str]] = {}
     for p in papers:
         themes.setdefault(p.get("theme") or "其他", []).append(p["id"])
-    return {
+    block = {
         "key": direction.key,
         "name": direction.name,
         "total": int(total),
@@ -104,6 +107,11 @@ def _direction_block(direction_key: str,
                    for label, ids in themes.items()],
         "papers": papers,
     }
+    if digest is not None:
+        block["digest"] = digest
+    if daily_highlights is not None:
+        block["daily_highlights"] = daily_highlights
+    return block
 
 
 def build_daily_facts(*, report_date: str, window_start: str, window_end: str,
@@ -143,12 +151,21 @@ def build_weekly_facts(*, report_date: str, week_start: str, week_end: str,
                        source_stats: dict[str, int],
                        daily_summaries: list[dict[str, Any]],
                        baseline: dict[str, Any] | None = None,
-                       notes: list[str] | None = None) -> dict[str, Any]:
+                       notes: list[str] | None = None,
+                       digests: dict[str, dict[str, Any]] | None = None,
+                       daily_highlights: dict[str, list[dict[str, Any]]] | None = None
+                       ) -> dict[str, Any]:
     directions = []
     flat: dict[str, dict[str, Any]] = {}
     for d in DIRECTIONS:
         items = selected.get(d.key, [])
-        block = _direction_block(d.key, items, totals.get(d.key, len(items)))
+        digest = (digests or {}).get(d.key)
+        total = digest.get("total", totals.get(d.key, len(items))) if digest else totals.get(
+            d.key, len(items))
+        block = _direction_block(
+            d.key, items, total, digest=digest,
+            daily_highlights=(daily_highlights or {}).get(d.key, []),
+        )
         directions.append(block)
         for paper in block["papers"]:
             flat[paper["id"]] = paper

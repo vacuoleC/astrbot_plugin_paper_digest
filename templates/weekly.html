@@ -17,6 +17,8 @@
   .direction { margin-top: 38px; page-break-inside: avoid; }
   .direction h2 { font-size: 32px; margin: 0 0 12px; padding-left: 14px; border-left: 8px solid #1f2328; }
   .analysis { font-size: 20px; line-height: 1.75; white-space: pre-wrap; }
+  .meta { font-size: 16px; color: #57606a; margin: -4px 0 10px; }
+  .daily { font-size: 16px; color: #3d444d; background: #fff8e6; border-radius: 8px; padding: 8px 12px; margin: 10px 0; line-height: 1.6; }
   .paper { margin-top: 14px; background: #f6f8fa; border-radius: 10px; padding: 14px 18px; }
   .paper h3 { font-size: 20px; margin: 0 0 6px; }
   .paper .reason { font-size: 18px; line-height: 1.65; color: #3d444d; }
@@ -40,7 +42,13 @@
   {% set block = facts.directions | selectattr("key", "equalto", d.key) | first %}
   <div class="direction">
     <h2>{{ loop.index }}. {{ d.name }}</h2>
+    {% if block and block.digest %}
+    <div class="meta">本周共 {{ block.digest.total }} 篇 · 主题：{{ block.digest.themes | map(attribute='label') | join(' / ') }}</div>
+    {% endif %}
     <div class="analysis">{{ d.analysis }}</div>
+    {% if block and block.daily_highlights %}
+    <div class="daily">本周日报精选：{% for h in block.daily_highlights[:5] %}{{ h.title[:36] }}{% if not loop.last %}；{% endif %}{% endfor %}</div>
+    {% endif %}
     {% for item in d.papers %}
     {% set paper = facts.papers.get(item.paper_id) %}
     {% if paper %}
