@@ -90,17 +90,17 @@
   "prefilter_per_direction": {
     "description": "LLM 分类前，每个方向保留的候选数",
     "type": "int",
-    "default": 200
+    "default": 120
   },
   "llm_batch_size": {
     "description": "LLM 分类每批论文数",
     "type": "int",
-    "default": 25
+    "default": 30
   },
   "llm_concurrency": {
     "description": "LLM 分类并发数",
     "type": "int",
-    "default": 4
+    "default": 6
   },
   "arxiv_request_interval": {
     "description": "arXiv API 请求最小间隔（秒，官方要求 3）",

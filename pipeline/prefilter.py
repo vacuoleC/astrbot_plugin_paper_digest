@@ -55,6 +55,7 @@ def prefilter(rows: Iterable[dict[str, Any]], per_direction: int = 200,
     候选论文表里包含每个方向上的粗筛分与最高分方向。
     """
     candidates: dict[int, dict[str, Any]] = {}
+    entries: dict[int, dict[str, Any]] = {}
     by_direction: dict[str, list[tuple[float, int]]] = {d.key: [] for d in directions}
 
     for row in rows:
@@ -68,12 +69,17 @@ def prefilter(rows: Iterable[dict[str, Any]], per_direction: int = 200,
         entry["prefilter_scores"] = scores
         entry["prefilter_best"] = best_key
         entry["prefilter_score"] = best_score
-        candidates[pk] = entry
+        entries[pk] = entry
         for key, value in positive.items():
             by_direction[key].append((value, pk))
 
     result: dict[str, list[int]] = {}
+    wanted: set[int] = set()
     for key, values in by_direction.items():
         values.sort(key=lambda x: x[0], reverse=True)
-        result[key] = [pk for _, pk in values[:per_direction]]
+        top = [pk for _, pk in values[:per_direction]]
+        result[key] = top
+        wanted.update(top)
+    # 只把各方向 top-N 的并集送给 LLM，避免把所有正分论文都送去分类
+    candidates = {pk: entries[pk] for pk in wanted}
     return candidates, result

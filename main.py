@@ -64,9 +64,9 @@ DEFAULTS: dict[str, Any] = {
     "daily_cap_factor": 4,
     "weekly_per_direction": 3,
     "max_themes_per_direction": 5,
-    "prefilter_per_direction": 200,
-    "llm_batch_size": 25,
-    "llm_concurrency": 4,
+    "prefilter_per_direction": 120,
+    "llm_batch_size": 30,
+    "llm_concurrency": 6,
     "arxiv_request_interval": 3,
     "http_timeout": 60,
     "overlap_hours": 24,
@@ -582,6 +582,7 @@ class Main(star.Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_build_daily(self, event: AstrMessageEvent):
         """立即生成当日日报（分类、选片、文案、趋势图和摘要卡），不推送，用于预览效果。"""
+        yield event.plain_result("⏳ 开始生成日报（分类/文案/渲染，首次约 5–10 分钟，缓存后约 1 分钟）...")
         now = datetime.now(self.tz)
         window_start = now - timedelta(hours=26)
         rows = self.store.papers_first_seen_between(
