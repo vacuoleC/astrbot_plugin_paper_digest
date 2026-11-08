@@ -83,6 +83,7 @@ tests/                  # 纯逻辑单元测试
 | `/paper_models` | 所有人 | 列出可用 provider，便于填写三个模型槽 |
 | `/paper_run_ingest` | 管理员 | 立即抓取所有源 |
 | `/paper_build_daily` | 管理员 | 立即生成当日日报（不推送） |
+| `/paper_build_weekly` | 管理员 | 立即生成最近 7 天周报（不推送，返回周报图） |
 | `/paper_skill_test daily\|weekly` | 管理员 | 用最近的 facts 跑 skill，返回原始 JSON |
 | `/paper_pin p123` | 管理员 | 置顶某篇论文 |
 | `/paper_skip p123` | 管理员 | 从选片中排除某篇论文 |

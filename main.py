@@ -607,6 +607,35 @@ class Main(star.Star):
         if image:
             yield event.image_result(image)
 
+    @filter.command("paper_build_weekly")
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    async def cmd_build_weekly(self, event: AstrMessageEvent):
+        """立即生成最近 7 天的周报（影响力选片、文案、周报图和卡片），不推送，用于预览效果。"""
+        yield event.plain_result("⏳ 开始生成周报（分类/影响力选片/文案/渲染，首次约 3–8 分钟，缓存后约 1 分钟）...")
+        now = datetime.now(self.tz)
+        window_start = now - timedelta(days=7)
+        rows = self.store.papers_first_seen_between(
+            window_start.astimezone(timezone.utc).isoformat(),
+            now.astimezone(timezone.utc).isoformat(),
+        )
+        if not rows:
+            yield event.plain_result("最近 7 天没有论文，先运行 /paper_run_ingest。")
+            return
+        report_date = now.strftime("%Y-%m-%d")
+        facts, copy, image, cards = await self.build_weekly(
+            report_date, rows, window_start, now
+        )
+        good_cards = sum(1 for v in cards.values() if v)
+        msg = (f"周报已生成（未推送）：入选 {facts['stats']['selected_total']} 篇，"
+               f"卡片 {good_cards} 张。")
+        if image:
+            msg += "\n周报图如下（同时已归档）。"
+        else:
+            msg += "\n周报图渲染失败（已重试），请查看日志；卡片已保存到归档目录。"
+        yield event.plain_result(msg)
+        if image:
+            yield event.image_result(image)
+
     @filter.command("paper_skill_test")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_skill_test(self, event: AstrMessageEvent, kind: str = "daily"):
