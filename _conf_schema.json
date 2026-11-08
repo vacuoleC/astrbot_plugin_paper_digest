@@ -1,16 +1,16 @@
 {
   "target_groups": {
-    "description": "正式推送群号，多个用英文逗号分隔",
-    "type": "string",
-    "default": ""
+    "description": "正式推送群号列表（在 WebUI 中逐项添加群号）",
+    "type": "list",
+    "default": []
   },
-  "test_group": {
-    "description": "测试群号；test_mode 为 true 时只发这里",
-    "type": "string",
-    "default": ""
+  "test_groups": {
+    "description": "测试群号列表；test_mode 为 true 时只发这里",
+    "type": "list",
+    "default": []
   },
   "test_mode": {
-    "description": "测试模式：只发 test_group，不发正式群",
+    "description": "测试模式：只发 test_groups 里的群，不发正式群",
     "type": "bool",
     "default": true
   },
@@ -23,6 +23,24 @@
     "description": "试运行：抓取、分类、生成都执行，但不发群",
     "type": "bool",
     "default": true
+  },
+  "provider_classify": {
+    "description": "分类/主题标注使用的 LLM 服务商。点击右侧按钮从 AstrBot 后台已配置的服务商中选择；留空 = 使用当前默认 provider。",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider"
+  },
+  "provider_summary": {
+    "description": "日报文案与导读使用的 LLM 服务商。点击右侧按钮从 AstrBot 后台已配置的服务商中选择；留空 = 使用当前默认 provider。",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider"
+  },
+  "provider_weekly": {
+    "description": "周报影响力分析使用的 LLM 服务商。点击右侧按钮从 AstrBot 后台已配置的服务商中选择；留空 = 使用当前默认 provider。",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider"
   },
   "push_time": {
     "description": "每日推送时间 HH:MM（arXiv 公告在北京时间 08:00–09:00，建议 09:30）",
@@ -46,21 +64,6 @@
   },
   "contact_email": {
     "description": "写入 User-Agent 的联系邮箱（NCBI/OpenAlex 礼貌池要求）",
-    "type": "string",
-    "default": ""
-  },
-  "provider_classify": {
-    "description": "分类/主题标注使用的 provider id（留空使用 AstrBot 默认）",
-    "type": "string",
-    "default": ""
-  },
-  "provider_summary": {
-    "description": "日报/论文导读使用的 provider id（留空使用默认）",
-    "type": "string",
-    "default": ""
-  },
-  "provider_weekly": {
-    "description": "周报影响力分析使用的 provider id（留空使用默认）",
     "type": "string",
     "default": ""
   },

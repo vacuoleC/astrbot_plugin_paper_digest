@@ -54,15 +54,15 @@ tests/                  # 纯逻辑单元测试
 
 | 配置 | 说明 | 默认 |
 |---|---|---|
-| `target_groups` | 正式群号，逗号分隔 | 空 |
-| `test_group` / `test_mode` | 测试群；测试模式只发测试群 | 空 / true |
+| `target_groups` | 正式推送群号列表（WebUI 列表编辑器） | [] |
+| `test_groups` / `test_mode` | 测试群号列表；测试模式只发测试群 | [] / true |
 | `enable_push` / `dry_run` | 是否真正推送；dry_run 只生成归档 | false / true |
 | `push_time` | 日报推送时间（建议 09:30，晚于 arXiv 公告） | 09:30 |
 | `weekly_push_time` | 周六周报时间 | 09:30 |
 | `hard_wall_time` | 质量硬截止，超时发降级简版 | 10:00 |
-| `provider_classify` | 分类/主题模型 | 空=默认 |
-| `provider_summary` | 日报文案与导读模型 | 空=默认 |
-| `provider_weekly` | 周报模型 | 空=默认 |
+| `provider_classify` | 分类/主题模型（WebUI 提供商选择器） | 空=默认 |
+| `provider_summary` | 日报文案与导读模型（WebUI 提供商选择器） | 空=默认 |
+| `provider_weekly` | 周报模型（WebUI 提供商选择器） | 空=默认 |
 | `daily_top_per_direction` | 每方向每日最多篇数 | 5 |
 | `daily_cap_factor` | 每日总上限 = factor × 7 | 4（=28） |
 | `weekly_per_direction` | 周报每方向篇数 | 3 |

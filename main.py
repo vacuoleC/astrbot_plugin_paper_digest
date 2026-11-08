@@ -46,7 +46,8 @@ from .store import Store
 from .textutils import parse_datetime
 
 DEFAULTS: dict[str, Any] = {
-    "target_groups": "",
+    "target_groups": [],
+    "test_groups": [],
     "test_group": "",
     "test_mode": True,
     "enable_push": False,
@@ -478,11 +479,23 @@ class Main(star.Star):
         if not enabled:
             return []
         if bool(self.config.get("test_mode")):
-            groups = [str(self.config.get("test_group") or "").strip()]
+            groups = self._parse_groups(self.config.get("test_groups"))
+            if not groups:
+                groups = self._parse_groups(self.config.get("test_group"))
         else:
-            groups = [g.strip() for g in re.split(
-                r"[,，]", str(self.config.get("target_groups") or "")) if g.strip()]
-        return [g for g in groups if g]
+            groups = self._parse_groups(self.config.get("target_groups"))
+        return groups
+
+    @staticmethod
+    def _parse_groups(value) -> list[str]:
+        """兼容 WebUI 的 list 类型和旧的逗号分隔字符串。"""
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            items = [str(v).strip() for v in value]
+        else:
+            items = [g.strip() for g in re.split(r"[,，]", str(value))]
+        return [g for g in items if g]
 
     async def _wait_until_push_time(self, weekly: bool = False) -> None:
         key = "weekly_push_time" if weekly else "push_time"
@@ -512,6 +525,8 @@ class Main(star.Star):
             lines.append(f"{source} 最后成功：{state['last_success_at'] if state else '从未'}")
         report = self.store.get_report("daily", now.strftime("%Y-%m-%d"))
         lines.append("今日日报：" + ("已生成" if report else "未生成"))
+        lines.append("正式群：" + (", ".join(self._parse_groups(self.config.get("target_groups"))) or "未配置"))
+        lines.append("测试群：" + (", ".join(self._parse_groups(self.config.get("test_groups"))) or "未配置"))
         for kind in ("daily", "weekly"):
             latest = self.store.latest_report(kind)
             if latest:
