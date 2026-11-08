@@ -515,6 +515,7 @@ class Main(star.Star):
 
     @filter.command("paper_status")
     async def cmd_status(self, event: AstrMessageEvent):
+        """查看论文速递运行状态：24 小时入库量、各数据源最后成功时间、日报/周报状态与默认模型。"""
         now = datetime.now(self.tz)
         since = (now - timedelta(hours=24)).astimezone(timezone.utc).isoformat()
         stats = self.store.stats(since)
@@ -537,6 +538,7 @@ class Main(star.Star):
 
     @filter.command("paper_models")
     async def cmd_models(self, event: AstrMessageEvent):
+        """列出 AstrBot 已配置的 provider，便于在插件配置里选择分类/日报/周报模型。"""
         lines = ["可用 provider："]
         try:
             providers = self.context.get_all_providers()
@@ -555,12 +557,14 @@ class Main(star.Star):
     @filter.command("paper_run_ingest")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_ingest(self, event: AstrMessageEvent):
+        """立即抓取所有论文源（arXiv、bioRxiv/medRxiv、Europe PMC、Crossref），用于手动补数据。"""
         counts = await self.ingest(include_arxiv=True, skip_recent_others=False)
         yield event.plain_result(f"抓取完成：{json.dumps(counts, ensure_ascii=False)}")
 
     @filter.command("paper_build_daily")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_build_daily(self, event: AstrMessageEvent):
+        """立即生成当日日报（分类、选片、文案、趋势图和摘要卡），不推送，用于预览效果。"""
         now = datetime.now(self.tz)
         window_start = now - timedelta(hours=26)
         rows = self.store.papers_first_seen_between(
@@ -582,6 +586,7 @@ class Main(star.Star):
     @filter.command("paper_skill_test")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_skill_test(self, event: AstrMessageEvent, kind: str = "daily"):
+        """用最近一次 facts 试跑 daily/weekly 的 SKILL.md，返回模型原始 JSON 输出，便于调文案。"""
         kind = (kind or "daily").strip()
         if kind not in ("daily", "weekly"):
             yield event.plain_result("用法：/paper_skill_test daily|weekly")
@@ -603,6 +608,7 @@ class Main(star.Star):
     @filter.command("paper_pin")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_pin(self, event: AstrMessageEvent, paper: str = ""):
+        """置顶某篇论文（参数为 p123 或 123），选片时优先保留。"""
         pk = self._parse_paper_pk(paper)
         if pk is None:
             yield event.plain_result("用法：/paper_pin p123")
@@ -613,6 +619,7 @@ class Main(star.Star):
     @filter.command("paper_skip")
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_skip(self, event: AstrMessageEvent, paper: str = ""):
+        """从选片中排除某篇论文（参数为 p123 或 123）。"""
         pk = self._parse_paper_pk(paper)
         if pk is None:
             yield event.plain_result("用法：/paper_skip p123")
