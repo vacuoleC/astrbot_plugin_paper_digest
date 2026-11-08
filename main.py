@@ -268,7 +268,7 @@ class Main(star.Star):
                 except Exception as exc:  # noqa: BLE001
                     logger.debug("upsert paper failed: %s", exc)
             self.store.save_fetch_state(adapter.name, "", now.isoformat())
-            logger.info("%s 抓取完成：%s 篇", adapter.name, inserted)
+            logger.info("%s 抓取完成：处理 %s 篇（含已存在论文）", adapter.name, inserted)
             return adapter.name, inserted
 
         # 多个源并发，避免 arXiv 的限流/超时拖住其它源
@@ -576,7 +576,7 @@ class Main(star.Star):
         if not counts:
             yield event.plain_result("抓取失败：所有数据源都没有成功请求，请稍后重试或查看日志。")
             return
-        yield event.plain_result(f"抓取完成：{json.dumps(counts, ensure_ascii=False)}")
+        yield event.plain_result(f"抓取完成（处理数，含已存在论文）：{json.dumps(counts, ensure_ascii=False)}")
 
     @filter.command("paper_build_daily")
     @filter.permission_type(filter.PermissionType.ADMIN)
