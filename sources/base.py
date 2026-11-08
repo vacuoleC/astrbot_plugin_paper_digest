@@ -89,6 +89,10 @@ class RateLimiter:
             self._next_at = time.monotonic() + self.interval
 
 
+class RateLimitError(RuntimeError):
+    """上游明确返回 429，调用方应停止该源的连续请求。"""
+
+
 class HttpClient:
     def __init__(self, *, timeout: float = 60, contact_email: str = "",
                  ssl_verify: bool = True) -> None:
@@ -115,22 +119,22 @@ class HttpClient:
             self.session = None
 
     async def get_text(self, url: str, *, params: dict | None = None,
-                       headers: dict | None = None, retries: int = 3) -> str:
+                       headers: dict | None = None, retries: int = 3,
+                       timeout: float | None = None) -> str:
         assert self.session is not None
         last: Exception | None = None
         for attempt in range(retries):
             try:
-                async with self.session.get(url, params=params, headers=headers) as resp:
+                async with self.session.get(url, params=params, headers=headers,
+                                            timeout=timeout) as resp:
                     if resp.status == 429:
-                        retry_after = resp.headers.get("Retry-After", "5")
-                        wait = float(retry_after) if retry_after.isdigit() else 5.0
-                        await asyncio.sleep(min(wait, 30))
-                        last = RuntimeError("HTTP 429")
-                        continue
+                        raise RateLimitError(f"HTTP 429: {url}")
                     if resp.status >= 400:
                         body = (await resp.text())[:300]
                         raise RuntimeError(f"HTTP {resp.status}: {body}")
                     return await resp.text()
+            except RateLimitError:
+                raise
             except Exception as exc:  # noqa: BLE001
                 last = exc
                 if attempt < retries - 1:
@@ -138,8 +142,10 @@ class HttpClient:
         raise RuntimeError(f"GET {url} failed after {retries} attempts: {last}")
 
     async def get_json(self, url: str, *, params: dict | None = None,
-                       headers: dict | None = None, retries: int = 3) -> Any:
-        text = await self.get_text(url, params=params, headers=headers, retries=retries)
+                       headers: dict | None = None, retries: int = 3,
+                       timeout: float | None = None) -> Any:
+        text = await self.get_text(url, params=params, headers=headers,
+                                   retries=retries, timeout=timeout)
         return json.loads(text)
 
 

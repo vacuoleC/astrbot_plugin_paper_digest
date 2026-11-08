@@ -31,6 +31,7 @@ class EuropePmcAdapter(SourceAdapter):
     async def fetch(self, client: HttpClient, window_start: datetime,
                     window_end: datetime) -> list[Paper]:
         papers: dict[str, Paper] = {}
+        ok_requests = 0
         # Europe PMC 索引有 3-7 天延迟，日期窗口向前放宽，靠 first_seen 去重
         start = (window_start - timedelta(days=self.lookback_days)).strftime("%Y-%m-%d")
         end = window_end.strftime("%Y-%m-%d")
@@ -59,6 +60,7 @@ class EuropePmcAdapter(SourceAdapter):
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("EuropePMC fetch failed for %s: %s", direction_key, exc)
                     break
+                ok_requests += 1
                 self.archive.write_json(self.name, f"{direction_key}_{cursor[:20]}", data)
                 results = (data.get("resultList") or {}).get("result") or []
                 if not results:
@@ -71,6 +73,8 @@ class EuropePmcAdapter(SourceAdapter):
                 if not next_cursor or next_cursor == cursor:
                     break
                 cursor = next_cursor
+        if ok_requests == 0:
+            raise RuntimeError("Europe PMC API 不可用：本轮没有任何成功请求")
         logger.info("EuropePMC: %s papers", len(papers))
         return list(papers.values())
 

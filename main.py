@@ -102,6 +102,7 @@ class Main(star.Star):
 
         self.scheduler = AsyncIOScheduler(timezone=self.tz)
         self._started = False
+        self._ingest_lock = asyncio.Lock()
 
     # ---------- lifecycle ----------
 
@@ -228,16 +229,24 @@ class Main(star.Star):
 
     async def ingest(self, *, include_arxiv: bool = True,
                      skip_recent_others: bool = True) -> dict[str, int]:
+        # 同一时间只允许一个抓取任务，避免手动/定时同时打 arXiv 触发 429
+        async with self._ingest_lock:
+            return await self._ingest_once(include_arxiv=include_arxiv,
+                                           skip_recent_others=skip_recent_others)
+
+    async def _ingest_once(self, *, include_arxiv: bool = True,
+                           skip_recent_others: bool = True) -> dict[str, int]:
         now = utcnow()
         overlap = timedelta(hours=int(self.config.get("overlap_hours") or 24))
-        counts: dict[str, int] = {}
-        for adapter in self._adapters(include_arxiv):
+        adapters = self._adapters(include_arxiv)
+
+        async def fetch_one(adapter):
             state = self.store.get_fetch_state(adapter.name)
             last = parse_datetime(state["last_success_at"]) if state else None
             if adapter.name != "arxiv" and skip_recent_others and last:
                 if now - last < timedelta(hours=12):
                     logger.info("%s 最近 12h 已抓取，跳过", adapter.name)
-                    continue
+                    return adapter.name, None
             start = (last - overlap) if last else (now - timedelta(days=7))
             start = max(start, now - timedelta(days=7))
             try:
@@ -249,7 +258,7 @@ class Main(star.Star):
                     papers = await adapter.fetch(client, start, now)
             except Exception as exc:  # noqa: BLE001
                 logger.error("%s 抓取失败: %s", adapter.name, exc)
-                continue
+                return adapter.name, None
             inserted = 0
             for paper in papers:
                 try:
@@ -257,10 +266,13 @@ class Main(star.Star):
                     inserted += 1
                 except Exception as exc:  # noqa: BLE001
                     logger.debug("upsert paper failed: %s", exc)
-            counts[adapter.name] = inserted
             self.store.save_fetch_state(adapter.name, "", now.isoformat())
             logger.info("%s 抓取完成：%s 篇", adapter.name, inserted)
-        return counts
+            return adapter.name, inserted
+
+        # 多个源并发，避免 arXiv 的限流/超时拖住其它源
+        results = await asyncio.gather(*(fetch_one(a) for a in adapters))
+        return {name: n for name, n in results if n is not None}
 
     # ---------- daily ----------
 
@@ -558,7 +570,11 @@ class Main(star.Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def cmd_ingest(self, event: AstrMessageEvent):
         """立即抓取所有论文源（arXiv、bioRxiv/medRxiv、Europe PMC、Crossref），用于手动补数据。"""
+        yield event.plain_result("⏳ 开始抓取所有论文源（arXiv 可能较慢，预计 1–3 分钟）...")
         counts = await self.ingest(include_arxiv=True, skip_recent_others=False)
+        if not counts:
+            yield event.plain_result("抓取失败：所有数据源都没有成功请求，请稍后重试或查看日志。")
+            return
         yield event.plain_result(f"抓取完成：{json.dumps(counts, ensure_ascii=False)}")
 
     @filter.command("paper_build_daily")

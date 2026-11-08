@@ -24,6 +24,7 @@ class BiorxivAdapter(SourceAdapter):
     async def fetch(self, client: HttpClient, window_start: datetime,
                     window_end: datetime) -> list[Paper]:
         papers: dict[str, Paper] = {}
+        ok_pages = 0
         start = window_start.strftime("%Y-%m-%d")
         end = window_end.strftime("%Y-%m-%d")
         for server in self.servers:
@@ -35,6 +36,7 @@ class BiorxivAdapter(SourceAdapter):
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("%s fetch failed at cursor %s: %s", server, cursor, exc)
                     break
+                ok_pages += 1
                 self.archive.write_json(self.name, f"{server}_{cursor}", data)
                 collection = data.get("collection") or []
                 if not collection:
@@ -59,6 +61,8 @@ class BiorxivAdapter(SourceAdapter):
                     break
                 if not total and len(collection) < 100:
                     break
+        if ok_pages == 0:
+            raise RuntimeError("bioRxiv/medRxiv API 不可用：本轮没有任何成功请求")
         logger.info("bioRxiv/medRxiv: %s papers", len(papers))
         return list(papers.values())
 

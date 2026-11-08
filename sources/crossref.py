@@ -28,6 +28,7 @@ class CrossrefAdapter(SourceAdapter):
     async def fetch(self, client: HttpClient, window_start: datetime,
                     window_end: datetime) -> list[Paper]:
         papers: dict[str, Paper] = {}
+        ok_requests = 0
         start = window_start.strftime("%Y-%m-%d")
         end = window_end.strftime("%Y-%m-%d")
         for direction_key, filters in self.direction_filters.items():
@@ -52,6 +53,7 @@ class CrossrefAdapter(SourceAdapter):
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Crossref fetch failed for %s: %s", direction_key, exc)
                     break
+                ok_requests += 1
                 self.archive.write_json(self.name, f"{direction_key}_{cursor[:16]}", data)
                 message = data.get("message") or {}
                 items = message.get("items") or []
@@ -65,6 +67,8 @@ class CrossrefAdapter(SourceAdapter):
                 if not next_cursor or next_cursor == cursor:
                     break
                 cursor = next_cursor
+        if ok_requests == 0:
+            raise RuntimeError("Crossref API 不可用：本轮没有任何成功请求")
         logger.info("Crossref: %s papers", len(papers))
         return list(papers.values())
 
