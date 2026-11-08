@@ -65,7 +65,11 @@ def compute_baseline(current_rows: list[dict[str, Any]],
                 "ratio": round(ratio, 2),
             })
     falling.sort(key=lambda x: x["ratio"])
-    return {"rising_terms": rising[:top_n], "falling_terms": falling[:top_n]}
+    return {
+        "available": bool(previous_rows) and sum(prev.values()) > 0,
+        "rising_terms": rising[:top_n],
+        "falling_terms": falling[:top_n],
+    }
 
 
 def paper_facts(item: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +123,10 @@ def build_daily_facts(*, report_date: str, window_start: str, window_end: str,
                       totals: dict[str, int],
                       source_stats: dict[str, int],
                       baseline: dict[str, Any],
-                      notes: list[str] | None = None) -> dict[str, Any]:
+                      notes: list[str] | None = None,
+                      direction_counts: dict[str, int] | None = None,
+                      direction_prev_counts: dict[str, int] | None = None
+                      ) -> dict[str, Any]:
     directions = []
     flat: dict[str, dict[str, Any]] = {}
     for d in DIRECTIONS:
@@ -139,6 +146,9 @@ def build_daily_facts(*, report_date: str, window_start: str, window_end: str,
             "selected_total": sum(len(v) for v in selected.values()),
         },
         "baseline": baseline,
+        "direction_counts": direction_counts or {},
+        "direction_prev_counts": direction_prev_counts or {},
+        "direction_max": max([1, *list((direction_counts or {}).values())]),
         "directions": directions,
         "papers": flat,
         "notes": notes or [],
@@ -153,7 +163,10 @@ def build_weekly_facts(*, report_date: str, week_start: str, week_end: str,
                        baseline: dict[str, Any] | None = None,
                        notes: list[str] | None = None,
                        digests: dict[str, dict[str, Any]] | None = None,
-                       daily_highlights: dict[str, list[dict[str, Any]]] | None = None
+                       daily_highlights: dict[str, list[dict[str, Any]]] | None = None,
+                       direction_counts: dict[str, int] | None = None,
+                       direction_prev_counts: dict[str, int] | None = None,
+                       direction_sparklines: dict[str, str] | None = None
                        ) -> dict[str, Any]:
     directions = []
     flat: dict[str, dict[str, Any]] = {}
@@ -181,6 +194,10 @@ def build_weekly_facts(*, report_date: str, week_start: str, week_end: str,
         },
         "daily_summaries": daily_summaries,
         "baseline": baseline or {},
+        "direction_counts": direction_counts or {},
+        "direction_prev_counts": direction_prev_counts or {},
+        "direction_sparklines": direction_sparklines or {},
+        "direction_max": max([1, *list((direction_counts or {}).values())]),
         "directions": directions,
         "papers": flat,
         "notes": notes or [],

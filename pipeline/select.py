@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any
 
 from ..directions import DIRECTIONS, DIRECTION_BY_KEY, Direction
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 CODE_SIGNALS = ("github", "code is available", "we release", "open-source",
                 "dataset is available", "benchmark")
 SOTA_SIGNALS = ("state-of-the-art", "sota", "outperform", "breakthrough")
+REVIEW_RE = re.compile(r"\b(review|survey|overview|tutorial)\b", re.IGNORECASE)
 
 
 def _relevance(cls: dict[str, Any] | None) -> float:
@@ -26,18 +29,31 @@ def _row_text(row: dict[str, Any]) -> str:
     return ((row.get("title") or "") + " " + (row.get("abstract") or "")).lower()
 
 
+def is_review(row: dict[str, Any]) -> bool:
+    text = (row.get("title") or "") + " " + (row.get("abstract") or "")
+    if REVIEW_RE.search(text):
+        return True
+    try:
+        categories = " ".join(json.loads(row.get("categories") or "[]"))
+    except Exception:  # noqa: BLE001
+        categories = ""
+    return "review" in categories.lower()
+
+
 def impact_score(row: dict[str, Any], cls: dict[str, Any] | None) -> float:
     """周报用的启发式影响力分；后续可用历史引用回放校准权重。"""
-    score = _relevance(cls) * 2.0
+    score = _relevance(cls) * 1.0
     if row.get("source") == "crossref":
-        score += 2.0  # 已正式发表
+        score += 1.0  # 已正式发表
     elif row.get("source") == "europepmc":
-        score += 1.0
+        score += 0.5
     text = _row_text(row)
     if any(sig in text for sig in CODE_SIGNALS):
         score += 1.0
     if any(sig in text for sig in SOTA_SIGNALS):
         score += 0.5
+    if is_review(row):
+        score -= 3.0  # 综述/教程不应该靠体量和来源刷到方向第一
     return score
 
 
@@ -110,6 +126,7 @@ def select_direction(rows: list[dict[str, Any]],
             "reason": (e["cls"] or {}).get("reason") or "",
             "pinned": e["pinned"],
             "impact_score": impact_score(e["row"], e["cls"]),
+            "is_review": is_review(e["row"]),
         })
     return result
 
@@ -160,7 +177,8 @@ def select_weekly(rows: list[dict[str, Any]],
                 "reason": cls.get("reason") or "",
                 "pinned": bool(ov and ov.get("action") == "pin"),
                 "impact_score": impact_score(row, cls),
+                "is_review": is_review(row),
             })
-        pool.sort(key=lambda x: (x["pinned"], x["impact_score"]), reverse=True)
+        pool.sort(key=lambda x: (x["pinned"], not x.get("is_review"), x["impact_score"]), reverse=True)
         selected[d.key] = pool[:per_direction]
     return selected

@@ -52,6 +52,15 @@ def normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).strip()
 
 
+def normalize_doi(doi: str) -> str:
+    """去掉 URL 前缀和版本后缀，作为跨版本去重键。"""
+    value = (doi or "").strip().lower()
+    value = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", value)
+    value = re.sub(r"/v\d+$", "", value)
+    value = re.sub(r"\.v\d+$", "", value)
+    return value.strip().strip("/")
+
+
 def title_fingerprint(title: str, first_author: str = "") -> str:
     raw = normalize_title(title) + "|" + (first_author or "").strip().lower()
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]

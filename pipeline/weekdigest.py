@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any
 
 from ..directions import DIRECTIONS, Direction
@@ -15,7 +15,7 @@ from .prefilter import score_paper
 
 logger = logging.getLogger(__name__)
 
-DIGEST_PROMPT_VERSION = "weekly-digest-v1"
+DIGEST_PROMPT_VERSION = "weekly-digest-v2"
 
 
 def assign_direction(row: dict[str, Any],
@@ -29,6 +29,18 @@ def assign_direction(row: dict[str, Any],
     scores = {d.key: score_paper(row, d) for d in directions}
     best_key, best_score = max(scores.items(), key=lambda kv: kv[1])
     return best_key if best_score > 0 else None
+
+
+def count_by_direction(rows: list[dict[str, Any]],
+                       classifications: dict[int, dict[str, Any]],
+                       directions: tuple[Direction, ...] = DIRECTIONS
+                       ) -> dict[str, int]:
+    counts: Counter = Counter()
+    for row in rows:
+        key = assign_direction(row, classifications, directions)
+        if key:
+            counts[key] += 1
+    return {d.key: int(counts.get(d.key, 0)) for d in directions}
 
 
 def _paper_item(row: dict[str, Any]) -> dict[str, Any]:

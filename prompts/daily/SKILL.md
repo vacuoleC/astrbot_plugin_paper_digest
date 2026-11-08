@@ -23,6 +23,8 @@ output_schema: copy.schema.json
 - `cited_paper_ids` 只能从该方向 `papers[].id` 中选择，2-4 个；不要发明 id。
 - 跨方向观察放在 `cross_observations`，最多 3 条；没有就留空数组。
 - `headline` 一句话总览；`summary` 2-3 句。
+- 如果 `baseline.available` 为 false（冷启动、没有历史窗口），不要写升温/降温判断。
+- 绝对不要输出内部字段名（previous、rising_terms、falling_terms、baseline 等）；用自然语言描述趋势。
 - 只输出 JSON，不要 markdown 代码块，不要额外文字。
 
 输出 JSON 结构（必须符合 copy.schema.json）：

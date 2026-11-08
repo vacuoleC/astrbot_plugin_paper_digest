@@ -49,6 +49,31 @@ def validate_copy(copy: dict[str, Any], schema_path: str | Path) -> None:
     validate(instance=copy, schema=schema)
 
 
+BAD_INTERNAL_TOKENS = ("previous=", "rising_terms", "falling_terms", "baseline")
+
+
+def _sanitize_internal_terms(copy: dict[str, Any]) -> dict[str, Any]:
+    """去掉模型复述出来的内部字段名（previous=、falling_terms 等）。"""
+    def clean(value: str) -> str:
+        if not any(tok in value.lower() for tok in BAD_INTERNAL_TOKENS):
+            return value
+        parts = re.split(r"(?<=[。；;.!?])", value)
+        kept = [p for p in parts if not any(tok in p.lower() for tok in BAD_INTERNAL_TOKENS)]
+        cleaned = "".join(kept).strip()
+        return cleaned or "（本周主题分布见上方统计）"
+
+    def walk(obj):
+        if isinstance(obj, str):
+            return clean(obj)
+        if isinstance(obj, list):
+            return [v for v in (walk(x) for x in obj) if v not in ("", None)]
+        if isinstance(obj, dict):
+            return {k: walk(v) for k, v in obj.items()}
+        return obj
+
+    return walk(copy)
+
+
 def _sanitize_ids(copy: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
     """过滤模型编造的 paper_id，只保留 facts 中存在的论文。"""
     valid = set((facts.get("papers") or {}).keys())
@@ -150,6 +175,7 @@ async def run_skill(*, kind: str, facts: dict[str, Any], prompt_dir: str | Path,
             copy = extract_json(raw_output)
             validate_copy(copy, schema_path)
             copy = _sanitize_ids(copy, facts)
+            copy = _sanitize_internal_terms(copy)
             store.save_skill_run(kind=kind, report_date=facts.get("date", ""),
                                  facts=facts, raw_output=raw_output, copy=copy,
                                  valid=True, error=None, model=model)

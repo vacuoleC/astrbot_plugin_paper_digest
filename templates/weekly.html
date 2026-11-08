@@ -26,6 +26,16 @@
   .cross h2 { font-size: 26px; margin: 0 0 8px; }
   .cross p { font-size: 20px; line-height: 1.75; white-space: pre-wrap; }
   .footer { margin-top: 44px; border-top: 1px solid #d0d7de; padding-top: 14px; font-size: 15px; color: #57606a; }
+  .wind { margin-top: 36px; page-break-inside: avoid; }
+  .wind h2 { font-size: 28px; margin: 0 0 6px; padding-left: 14px; border-left: 8px solid #1f2328; }
+  .wind-note { font-size: 16px; color: #57606a; margin-bottom: 14px; }
+  .wind-row { display: flex; align-items: center; gap: 12px; margin: 9px 0; font-size: 17px; }
+  .wind-name { width: 120px; flex: none; }
+  .wind-bar { flex: 1; height: 16px; background: #eaeef2; border-radius: 8px; overflow: hidden; }
+  .wind-fill { display: block; height: 100%; background: #1f2328; border-radius: 8px; }
+  .wind-count { width: 60px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+  .wind-delta { width: 90px; text-align: right; flex: none; color: #57606a; }
+  .spark { flex: none; }
 </style>
 </head>
 <body>
@@ -47,7 +57,7 @@
     {% endif %}
     <div class="analysis">{{ d.analysis }}</div>
     {% if block and block.daily_highlights %}
-    <div class="daily">本周日报精选：{% for h in block.daily_highlights[:5] %}{{ h.title[:36] }}{% if not loop.last %}；{% endif %}{% endfor %}</div>
+    <div class="daily">本周日报精选：{% for h in block.daily_highlights[:5] %}{{ h.title[:36] }}{% if h.title|length > 36 %}…{% endif %}{% if not loop.last %}；{% endif %}{% endfor %}</div>
     {% endif %}
     {% for item in d.papers %}
     {% set paper = facts.papers.get(item.paper_id) %}
@@ -68,6 +78,26 @@
   {% if copy.next_week %}
   <div class="cross"><h2>下周关注</h2><ul>{% for x in copy.next_week %}<li>{{ x }}</li>{% endfor %}</ul></div>
   {% endif %}
+  {% if facts.get('direction_counts') %}
+  <div class="wind">
+    <h2>方向数量风向</h2>
+    <div class="wind-note">本周 {{ facts.week.start[:10] }} ~ {{ facts.week.end[:10] }} · 对比上一周（全部归属论文）</div>
+    {% for d in facts.directions %}
+    {% set cnt = facts.get('direction_counts', {}).get(d.key, 0) %}
+    {% set prev = facts.get('direction_prev_counts', {}).get(d.key, 0) %}
+    {% set pct = (cnt / facts.get('direction_max', 1) * 100) if facts.get('direction_max') else 0 %}
+    {% set spark = facts.get('direction_sparklines', {}).get(d.key, '') %}
+    <div class="wind-row">
+      <span class="wind-name">{{ d.name }}</span>
+      <div class="wind-bar"><span class="wind-fill" style="width: {{ '%.1f'|format(pct) }}%"></span></div>
+      <span class="wind-count">{{ cnt }}</span>
+      <span class="wind-delta">{% if cnt > prev %}↑ +{{ cnt - prev }}{% elif cnt < prev %}↓ {{ cnt - prev }}{% else %}→ 0{% endif %}</span>
+      {% if spark %}<svg class="spark" width="110" height="22" viewBox="0 0 110 22"><polyline points="{{ spark }}" fill="none" stroke="#1f2328" stroke-width="2"/></svg>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="footer">数据源：{{ facts.stats.sources.keys() | join(" / ") }} · 生成时间 {{ generated_at }} · 论文链接见随后的合并转发</div>
 </body>
 </html>

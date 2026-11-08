@@ -21,17 +21,25 @@ from astrbot.api.star import StarTools
 from .directions import DIRECTIONS, DIRECTION_BY_KEY
 from .llm import provider_name, resolve_provider
 from .pipeline import (
+    PROMPT_VERSION,
     allocate_cap,
     build_daily_facts,
     build_week_digests,
     build_weekly_facts,
     classify_candidates,
     compute_baseline,
+    count_by_direction,
     prefilter,
     select_direction,
     select_weekly,
 )
-from .pipeline.normalize import abstract_snippet, paper_id
+from .pipeline.normalize import (
+    abstract_snippet,
+    dedupe_rows,
+    filter_backfill_rows,
+    paper_id,
+    report_dedup_key,
+)
 from .push import get_adapter, push_daily, push_weekly
 from .render import Renderer
 from .skills import run_skill
@@ -336,12 +344,25 @@ class Main(star.Star):
                           window_start: datetime, window_end: datetime
                           ) -> tuple[dict[str, Any], dict[str, Any], str | None,
                                      dict[str, str | None]]:
+        rows = filter_backfill_rows(dedupe_rows(rows), window_start)
         candidates, _ = prefilter(
             rows, per_direction=int(self.config.get("prefilter_per_direction") or 200)
         )
         classifications = await classify_candidates(
             self.context, candidates, self.config, self.store
         )
+        direction_counts = count_by_direction(rows, classifications)
+        span = window_end - window_start
+        prev_start = window_start - span
+        prev_rows = self.store.papers_first_seen_between(
+            prev_start.astimezone(timezone.utc).isoformat(),
+            window_start.astimezone(timezone.utc).isoformat(),
+        )
+        prev_rows = filter_backfill_rows(dedupe_rows(prev_rows), prev_start)
+        prev_cls = self.store.get_classifications(
+            [int(r["pk"]) for r in prev_rows], PROMPT_VERSION
+        )
+        direction_prev_counts = count_by_direction(prev_rows, prev_cls)
         overrides = self.store.get_overrides()
         selected: dict[str, list[dict[str, Any]]] = {}
         for d in DIRECTIONS:
@@ -362,12 +383,19 @@ class Main(star.Star):
             window_start.astimezone(timezone.utc).isoformat(),
         )
         baseline = compute_baseline(rows, previous_rows)
+        if not baseline.get("available"):
+            baseline = {
+                "available": False,
+                "note": "冷启动：上一窗口没有可用历史数据，不要做升温/降温判断。",
+            }
         facts = build_daily_facts(
             report_date=report_date,
-            window_start=window_start.astimezone(timezone.utc).isoformat(),
-            window_end=window_end.astimezone(timezone.utc).isoformat(),
+            window_start=window_start.isoformat(),
+            window_end=window_end.isoformat(),
             selected=selected, totals=dict(totals),
             source_stats=dict(source_stats), baseline=baseline,
+            direction_counts=direction_counts,
+            direction_prev_counts=direction_prev_counts,
         )
         for d in DIRECTIONS:
             self.store.save_selection(
@@ -435,6 +463,7 @@ class Main(star.Star):
                            window_start: datetime, window_end: datetime
                            ) -> tuple[dict[str, Any], dict[str, Any], str | None,
                                       dict[str, str | None]]:
+        rows = filter_backfill_rows(dedupe_rows(rows), window_start)
         candidates, _ = prefilter(
             rows, per_direction=int(self.config.get("prefilter_per_direction") or 200)
         )
@@ -448,6 +477,38 @@ class Main(star.Star):
         )
         totals = Counter(cls.get("primary") for cls in classifications.values())
         source_stats = Counter(row.get("source") or "unknown" for row in rows)
+
+        direction_counts = count_by_direction(rows, classifications)
+        prev_start = window_start - timedelta(days=7)
+        prev_rows = self.store.papers_first_seen_between(
+            prev_start.astimezone(timezone.utc).isoformat(),
+            window_start.astimezone(timezone.utc).isoformat(),
+        )
+        prev_rows = filter_backfill_rows(dedupe_rows(prev_rows), prev_start)
+        prev_cls = self.store.get_classifications(
+            [int(r["pk"]) for r in prev_rows], PROMPT_VERSION
+        )
+        direction_prev_counts = count_by_direction(prev_rows, prev_cls)
+        daily_counts = []
+        for offset in range(7):
+            bucket_start = window_start + timedelta(days=offset)
+            bucket_end = bucket_start + timedelta(days=1)
+            day_rows = self.store.papers_first_seen_between(
+                bucket_start.astimezone(timezone.utc).isoformat(),
+                bucket_end.astimezone(timezone.utc).isoformat(),
+            )
+            day_rows = filter_backfill_rows(dedupe_rows(day_rows), bucket_start)
+            day_cls = self.store.get_classifications(
+                [int(r["pk"]) for r in day_rows], PROMPT_VERSION
+            )
+            daily_counts.append({
+                "date": bucket_start.strftime("%m-%d"),
+                "counts": count_by_direction(day_rows, day_cls),
+            })
+        direction_sparklines = {
+            d.key: self._sparkline([item["counts"].get(d.key, 0) for item in daily_counts])
+            for d in DIRECTIONS
+        }
 
         # 周报不能只看 3 篇精选：按方向汇总本周全部论文（标题+摘要片段），
         # 让 weekly SKILL 能对该方向整体做点评。
@@ -473,11 +534,14 @@ class Main(star.Star):
 
         facts = build_weekly_facts(
             report_date=report_date,
-            week_start=window_start.astimezone(timezone.utc).isoformat(),
-            week_end=window_end.astimezone(timezone.utc).isoformat(),
+            week_start=window_start.isoformat(),
+            week_end=window_end.isoformat(),
             selected=selected, totals=dict(totals),
             source_stats=dict(source_stats), daily_summaries=daily_summaries,
             baseline={}, digests=digests, daily_highlights=daily_highlights,
+            direction_counts=direction_counts,
+            direction_prev_counts=direction_prev_counts,
+            direction_sparklines=direction_sparklines,
         )
         self.store.save_report("weekly", report_date, facts, copy=None, status="built")
         copy = await run_skill(
@@ -493,10 +557,23 @@ class Main(star.Star):
         cards = await self.renderer.render_cards(facts)
         return facts, copy, image, cards
 
+    @staticmethod
+    def _sparkline(values: list[int], width: int = 110, height: int = 22) -> str:
+        if not values:
+            return ""
+        mx = max(values) or 1
+        n = len(values)
+        if n == 1:
+            return f"0,{height - 2} {width},{height - 2}"
+        return " ".join(
+            f"{i * width / (n - 1):.1f},{height - 2 - (v / mx) * (height - 6):.1f}"
+            for i, v in enumerate(values)
+        )
+
     def _collect_daily_highlights(self, window_end: datetime) -> dict[str, list[dict]]:
         """收集本周日报里出现过的精选论文，供周报参考。"""
         out: dict[str, list[dict]] = {d.key: [] for d in DIRECTIONS}
-        seen: set[tuple[str, int]] = set()
+        seen: set[tuple[str, str]] = set()
         for offset in range(7):
             day = (window_end - timedelta(days=offset)).strftime("%Y-%m-%d")
             for d in DIRECTIONS:
@@ -504,13 +581,13 @@ class Main(star.Star):
                 if not selection:
                     continue
                 for pk in selection.get("paper_pks") or []:
-                    key = (d.key, int(pk))
-                    if key in seen:
-                        continue
-                    seen.add(key)
                     row = self.store.get_paper(int(pk))
                     if not row:
                         continue
+                    key = (d.key, report_dedup_key(row))
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     out[d.key].append({
                         "id": paper_id(row["pk"]),
                         "title": row.get("title") or "",

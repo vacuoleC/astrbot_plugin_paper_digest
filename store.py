@@ -7,11 +7,13 @@ import logging
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 logger = logging.getLogger(__name__)
+
+from .textutils import parse_datetime
 
 
 def _now() -> str:
@@ -156,6 +158,11 @@ class Store:
                 );
                 """
             )
+            # 首次加入 backfill 列时，把已有论文全部标记为历史回填
+            cols = {row[1] for row in con.execute("PRAGMA table_info(papers)")}
+            if "backfill" not in cols:
+                con.execute("ALTER TABLE papers ADD COLUMN backfill INTEGER DEFAULT 0")
+                con.execute("UPDATE papers SET backfill=1")
 
     # ---------- papers ----------
 
@@ -165,12 +172,13 @@ class Store:
         with self._lock, self.connect() as con:
             row = con.execute("SELECT * FROM papers WHERE canonical_key = ?", (key,)).fetchone()
             if row is None:
+                backfill = self._paper_backfill(paper)
                 cur = con.execute(
                     """INSERT INTO papers
                        (canonical_key, doi, arxiv_id, pmid, source, source_id, title,
                         abstract, authors, url, published, categories, raw_json,
-                        first_seen_at, updated_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        first_seen_at, updated_at, backfill)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         key, paper.doi, paper.arxiv_id, paper.pmid,
                         paper.source, paper.source_id, paper.title,
@@ -178,6 +186,7 @@ class Store:
                         paper.url or "", paper.published,
                         json.dumps(paper.categories, ensure_ascii=False),
                         json.dumps(paper.raw or {}, ensure_ascii=False), now, now,
+                        backfill,
                     ),
                 )
                 pk = int(cur.lastrowid)
@@ -213,6 +222,16 @@ class Store:
                 (pk, paper.source, paper.source_id, paper.doi, paper.arxiv_id, paper.pmid),
             )
             return pk
+
+    @staticmethod
+    def _paper_backfill(paper) -> int:
+        """arXiv 的 published 常落后于公告时间，不算回填；其它源超过 3 天的算回填。"""
+        if getattr(paper, "source", "") == "arxiv":
+            return 0
+        dt = parse_datetime(getattr(paper, "published", None))
+        if dt is None:
+            return 0
+        return 1 if dt < datetime.now(timezone.utc) - timedelta(days=3) else 0
 
     def get_paper(self, pk: int) -> dict[str, Any] | None:
         with self.connect() as con:

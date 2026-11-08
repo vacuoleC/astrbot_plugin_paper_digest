@@ -17,6 +17,7 @@ import aiohttp
 
 from ..textutils import (  # noqa: F401  (re-exported for adapters)
     iso,
+    normalize_doi,
     normalize_title,
     parse_datetime,
     title_fingerprint,
@@ -48,7 +49,7 @@ class Paper:
 
     def canonical_key(self) -> str:
         if self.doi:
-            return "doi:" + self.doi.strip().lower()
+            return "doi:" + normalize_doi(self.doi)
         if self.arxiv_id:
             base = re.sub(r"v\d+$", "", self.arxiv_id.strip(), flags=re.IGNORECASE)
             return "arxiv:" + base.lower()
