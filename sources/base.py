@@ -183,6 +183,8 @@ class Archive:
 class SourceAdapter:
     name = "base"
     ssl_verify = True
+    # 每次抓取固定回看的自然日数；不依赖上次成功时间，避免源日期滞后导致漏抓
+    fetch_lookback_days = 7
 
     def __init__(self, *, archive: Archive, contact_email: str = "",
                  timeout: float = 60, debug: bool = False) -> None:

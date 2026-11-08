@@ -237,7 +237,6 @@ class Main(star.Star):
     async def _ingest_once(self, *, include_arxiv: bool = True,
                            skip_recent_others: bool = True) -> dict[str, int]:
         now = utcnow()
-        overlap = timedelta(hours=int(self.config.get("overlap_hours") or 24))
         adapters = self._adapters(include_arxiv)
 
         async def fetch_one(adapter):
@@ -247,8 +246,10 @@ class Main(star.Star):
                 if now - last < timedelta(hours=12):
                     logger.info("%s 最近 12h 已抓取，跳过", adapter.name)
                     return adapter.name, None
-            start = (last - overlap) if last else (now - timedelta(days=7))
-            start = max(start, now - timedelta(days=7))
+            # 固定回看窗口：不依赖上次成功时间，避免 arXiv 的 submittedDate 滞后导致漏抓；
+            # 重复条目由 first_seen/upsert 去重。
+            lookback_days = int(getattr(adapter, "fetch_lookback_days", 7) or 7)
+            start = now - timedelta(days=lookback_days)
             try:
                 async with HttpClient(
                     timeout=float(self.config.get("http_timeout") or 60),

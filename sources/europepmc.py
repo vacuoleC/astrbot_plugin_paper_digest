@@ -17,10 +17,12 @@ class EuropePmcAdapter(SourceAdapter):
     # 容器内 Python 默认 TLS 握手访问 EBI 会 ConnectionReset（2026-11-09 实测），
     # curl 和 ssl=False 正常，因此对 EBI 关闭证书校验。
     ssl_verify = False
+    # 查询本身会向前看 lookback_days 天，抓取窗口只需 1 天
+    fetch_lookback_days = 1
 
     def __init__(self, *, direction_terms: dict[str, tuple[str, ...]],
                  page_size: int = 1000, max_pages: int = 5,
-                 lookback_days: int = 14, **kwargs) -> None:
+                 lookback_days: int = 7, **kwargs) -> None:
         super().__init__(**kwargs)
         self.direction_terms = direction_terms
         self.page_size = page_size
