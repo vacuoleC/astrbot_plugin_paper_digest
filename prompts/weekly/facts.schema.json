@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "kind", "date", "week", "directions", "papers"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "kind": {"type": "string", "const": "weekly"},
+    "date": {"type": "string"},
+    "week": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {"start": {"type": "string"}, "end": {"type": "string"}}
+    },
+    "stats": {"type": "object"},
+    "daily_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {"type": "string"},
+          "headline": {"type": "string"},
+          "summary": {"type": "string"},
+          "directions": {"type": "array"}
+        }
+      }
+    },
+    "baseline": {"type": "object"},
+    "directions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "total", "selected_count", "themes", "papers"],
+        "properties": {
+          "key": {"type": "string"},
+          "name": {"type": "string"},
+          "total": {"type": "integer"},
+          "selected_count": {"type": "integer"},
+          "themes": {"type": "array"},
+          "papers": {"type": "array"}
+        }
+      }
+    },
+    "papers": {"type": "object"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

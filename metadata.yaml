@@ -1,0 +1,7 @@
+name: astrbot_plugin_paper_digest
+display_name: 论文速递 Paper Digest
+desc: 多平台论文趋势日报与周报。抓取 arXiv / bioRxiv / medRxiv / Europe PMC / Crossref，按七个研究方向做主题聚类与 LLM 分类，生成趋势图、论文摘要卡和每日/每周推送。
+version: v0.1.0
+author: vacuoC
+repo: https://github.com/vacuoleC/astrbot_plugin_paper_digest
+astrbot_version: ">=4.27.0"

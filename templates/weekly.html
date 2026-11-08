@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 52px 60px; width: 1400px;
+    font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+    color: #1f2328; background: #ffffff;
+  }
+  .kicker { font-size: 18px; letter-spacing: 2px; color: #57606a; }
+  h1 { font-size: 46px; line-height: 1.25; margin: 12px 0 16px; }
+  .overview { font-size: 21px; line-height: 1.75; color: #3d444d; }
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; margin: 22px 0; }
+  .stat { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 10px; padding: 10px 16px; font-size: 18px; }
+  .direction { margin-top: 38px; page-break-inside: avoid; }
+  .direction h2 { font-size: 32px; margin: 0 0 12px; padding-left: 14px; border-left: 8px solid #1f2328; }
+  .analysis { font-size: 20px; line-height: 1.75; white-space: pre-wrap; }
+  .paper { margin-top: 14px; background: #f6f8fa; border-radius: 10px; padding: 14px 18px; }
+  .paper h3 { font-size: 20px; margin: 0 0 6px; }
+  .paper .reason { font-size: 18px; line-height: 1.65; color: #3d444d; }
+  .cross { margin-top: 34px; background: #f6f8fa; border-radius: 12px; padding: 20px 24px; }
+  .cross h2 { font-size: 26px; margin: 0 0 8px; }
+  .cross p { font-size: 20px; line-height: 1.75; white-space: pre-wrap; }
+  .footer { margin-top: 44px; border-top: 1px solid #d0d7de; padding-top: 14px; font-size: 15px; color: #57606a; }
+</style>
+</head>
+<body>
+  <div class="kicker">WEEKLY PAPER REVIEW · {{ facts.week.start[:10] }} ~ {{ facts.week.end[:10] }}</div>
+  <h1>{{ copy.headline }}</h1>
+  <div class="overview">{{ copy.overview }}</div>
+  <div class="stats">
+    <div class="stat">本周收录 <b>{{ facts.stats.total_new }}</b> 篇</div>
+    <div class="stat">精选 <b>{{ facts.stats.selected_total }}</b> 篇</div>
+    {% for src, n in facts.stats.sources.items() %}<div class="stat">{{ src }} <b>{{ n }}</b></div>{% endfor %}
+  </div>
+
+  {% for d in copy.directions %}
+  {% set block = facts.directions | selectattr("key", "equalto", d.key) | first %}
+  <div class="direction">
+    <h2>{{ loop.index }}. {{ d.name }}</h2>
+    <div class="analysis">{{ d.analysis }}</div>
+    {% for item in d.papers %}
+    {% set paper = facts.papers.get(item.paper_id) %}
+    {% if paper %}
+    <div class="paper">
+      <h3>{{ paper.title }}</h3>
+      <div class="reason">{{ item.reason }}</div>
+      <div class="footer" style="border:none; margin-top:8px; padding:0;">{{ paper.source }} · {{ paper.published }} · {{ paper.url }}</div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {% if copy.cross_field %}
+  <div class="cross"><h2>跨方向观察</h2><p>{{ copy.cross_field }}</p></div>
+  {% endif %}
+  {% if copy.next_week %}
+  <div class="cross"><h2>下周关注</h2><ul>{% for x in copy.next_week %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  <div class="footer">数据源：{{ facts.stats.sources.keys() | join(" / ") }} · 生成时间 {{ generated_at }} · 论文链接见随后的合并转发</div>
+</body>
+</html>

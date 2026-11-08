@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "headline", "summary", "directions"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "headline": {"type": "string", "minLength": 1, "maxLength": 120},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 800},
+    "directions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "name", "trend", "bullets", "cited_paper_ids"],
+        "properties": {
+          "key": {"type": "string"},
+          "name": {"type": "string"},
+          "trend": {"type": "string", "minLength": 1, "maxLength": 200},
+          "bullets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {"type": "string", "maxLength": 100}
+          },
+          "cited_paper_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^p[0-9]+$"}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "cross_observations": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {"type": "string", "maxLength": 200}
+    },
+    "cited_paper_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^p[0-9]+$"}
+    }
+  },
+  "additionalProperties": false
+}

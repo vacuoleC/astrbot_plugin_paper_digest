@@ -1,0 +1,132 @@
+{
+  "target_groups": {
+    "description": "正式推送群号，多个用英文逗号分隔",
+    "type": "string",
+    "default": ""
+  },
+  "test_group": {
+    "description": "测试群号；test_mode 为 true 时只发这里",
+    "type": "string",
+    "default": ""
+  },
+  "test_mode": {
+    "description": "测试模式：只发 test_group，不发正式群",
+    "type": "bool",
+    "default": true
+  },
+  "enable_push": {
+    "description": "是否真正向群推送；关闭时只生成报告和图片到归档目录",
+    "type": "bool",
+    "default": false
+  },
+  "dry_run": {
+    "description": "试运行：抓取、分类、生成都执行，但不发群",
+    "type": "bool",
+    "default": true
+  },
+  "push_time": {
+    "description": "每日推送时间 HH:MM（arXiv 公告在北京时间 08:00–09:00，建议 09:30）",
+    "type": "string",
+    "default": "09:30"
+  },
+  "weekly_push_time": {
+    "description": "周报推送时间 HH:MM（周六）",
+    "type": "string",
+    "default": "09:30"
+  },
+  "hard_wall_time": {
+    "description": "质量硬截止时间 HH:MM，超时则发送降级简版",
+    "type": "string",
+    "default": "10:00"
+  },
+  "timezone": {
+    "description": "调度时区",
+    "type": "string",
+    "default": "Asia/Shanghai"
+  },
+  "contact_email": {
+    "description": "写入 User-Agent 的联系邮箱（NCBI/OpenAlex 礼貌池要求）",
+    "type": "string",
+    "default": ""
+  },
+  "provider_classify": {
+    "description": "分类/主题标注使用的 provider id（留空使用 AstrBot 默认）",
+    "type": "string",
+    "default": ""
+  },
+  "provider_summary": {
+    "description": "日报/论文导读使用的 provider id（留空使用默认）",
+    "type": "string",
+    "default": ""
+  },
+  "provider_weekly": {
+    "description": "周报影响力分析使用的 provider id（留空使用默认）",
+    "type": "string",
+    "default": ""
+  },
+  "daily_top_per_direction": {
+    "description": "每个方向每日最多入选篇数",
+    "type": "int",
+    "default": 5
+  },
+  "daily_cap_factor": {
+    "description": "每日总篇数上限 = 该值 × 方向数（7 个方向时为 28）",
+    "type": "int",
+    "default": 4
+  },
+  "weekly_per_direction": {
+    "description": "周报每个方向入选篇数",
+    "type": "int",
+    "default": 3
+  },
+  "max_themes_per_direction": {
+    "description": "每个方向每日主题聚类上限",
+    "type": "int",
+    "default": 5
+  },
+  "prefilter_per_direction": {
+    "description": "LLM 分类前，每个方向保留的候选数",
+    "type": "int",
+    "default": 200
+  },
+  "llm_batch_size": {
+    "description": "LLM 分类每批论文数",
+    "type": "int",
+    "default": 25
+  },
+  "llm_concurrency": {
+    "description": "LLM 分类并发数",
+    "type": "int",
+    "default": 4
+  },
+  "arxiv_request_interval": {
+    "description": "arXiv API 请求最小间隔（秒，官方要求 3）",
+    "type": "int",
+    "default": 3
+  },
+  "http_timeout": {
+    "description": "HTTP 请求超时（秒）",
+    "type": "int",
+    "default": 60
+  },
+  "overlap_hours": {
+    "description": "每次抓取与上次水位线的重叠小时数，防止漏抓",
+    "type": "int",
+    "default": 24
+  },
+  "archive_dir": {
+    "description": "图片/原始响应/报告归档目录（容器内路径）",
+    "type": "string",
+    "default": "/AstrBot/paperdaily"
+  },
+  "retain_days": {
+    "description": "归档保留天数",
+    "type": "int",
+    "default": 180
+  },
+  "debug": {
+    "description": "输出调试日志",
+    "type": "bool",
+    "default": false
+  }
+}
