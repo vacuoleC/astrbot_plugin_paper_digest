@@ -125,8 +125,11 @@ def allocate_cap(selected: dict[str, list[dict[str, Any]]], cap: int
             break
         key, items = max(candidates, key=lambda kv: (len(kv[1]), -sum(
             x.get("relevance", 0) for x in kv[1]) / max(len(kv[1]), 1)))
-        victim = min(items, key=lambda x: (x.get("relevance", 0),
-                                           x.get("row", {}).get("prefilter_score", 0)))
+        non_pinned = [x for x in items if not x.get("pinned")]
+        victim = min(non_pinned or items, key=lambda x: (
+            x.get("relevance", 0),
+            x.get("row", {}).get("prefilter_score", 0),
+        ))
         selected[key].remove(victim)
         dropped.append(victim)
     return selected, dropped

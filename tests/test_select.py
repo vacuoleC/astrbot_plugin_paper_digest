@@ -74,6 +74,19 @@ class SelectTest(unittest.TestCase):
         self.assertEqual(sum(len(v) for v in capped.values()), 28)
         self.assertEqual(len(dropped), len(DIRECTIONS) * 5 - 28)
 
+    def test_allocate_cap_protects_pinned(self):
+        selected = {
+            d.key: [{"pk": i, "relevance": 1.0, "pinned": False,
+                     "row": {"prefilter_score": 1}} for i in range(5)]
+            for d in DIRECTIONS
+        }
+        first = DIRECTIONS[0].key
+        selected[first][0]["pinned"] = True
+        selected[first][0]["relevance"] = 0.1
+        capped, _ = allocate_cap(selected, 28)
+        kept = [x["pk"] for x in capped[first]]
+        self.assertIn(0, kept)
+
     def test_weekly_returns_at_most_per_direction(self):
         rows = [row(i, f"p{i}", source="crossref" if i % 2 else "arxiv")
                 for i in range(1, 9)]
